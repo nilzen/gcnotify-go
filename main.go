@@ -11,6 +11,7 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -27,7 +28,9 @@ type SettingsObject struct {
 
 func main() {
 
-	db, err := sqlite3.Open("gcnotify.db")
+	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
+
+	db, err := sqlite3.Open(dir + "/gcnotify.db")
 
 	if err != nil {
 		fmt.Printf("Database error: %v\n", err)
