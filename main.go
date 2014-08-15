@@ -86,7 +86,7 @@ func main() {
 		case html.ErrorToken:
 
 			if !foundCacheRow {
-				sendErrorPush("No caches returned", settings)
+				sendPush("No caches returned", "", settings)
 			}
 
 			return
@@ -134,7 +134,7 @@ func main() {
 				text := tokenizer.Text()
 
 				if !isDisabledCache && isNewCache(db, currentCacheLink, settings.GeocachingUserId) {
-					sendPush(db, currentCacheLink, string(text), settings)
+					notifyNewCache(db, currentCacheLink, string(text), settings)
 				}
 			}
 		}
@@ -158,33 +158,27 @@ func isNewCache(db *sqlite3.Conn, url, userId string) bool {
 	return err != nil
 }
 
-func sendPush(db *sqlite3.Conn, cacheUrl, title string, settings SettingsObject) {
+func notifyNewCache(db *sqlite3.Conn, cacheUrl, title string, settings SettingsObject) {
 
-	data := url.Values{
-		"token":   {settings.PushoverToken},
-		"user":    {settings.PushoverUser},
-		"message": {title},
-		"url":     {cacheUrl},
-	}
-
-	_, err := http.PostForm("https://api.pushover.net/1/messages.json", data)
-
-	if err == nil {
+	if sendPush(title, cacheUrl, settings) {
 		sql := fmt.Sprintf("INSERT INTO notifications (url, title, userid) VALUES ('%s', '%s', '%s');", cacheUrl, title, settings.GeocachingUserId)
 
 		db.Exec(sql)
 	}
 }
 
-func sendErrorPush(message string, settings SettingsObject) {
+func sendPush(pushMessage, pushUrl string, settings SettingsObject) bool {
 
 	data := url.Values{
 		"token":   {settings.PushoverToken},
 		"user":    {settings.PushoverUser},
-		"message": {message},
+		"message": {pushMessage},
+		"url":     {pushUrl},
 	}
 
-	http.PostForm("https://api.pushover.net/1/messages.json", data)
+	_, err := http.PostForm("https://api.pushover.net/1/messages.json", data)
+
+	return err == nil
 }
 
 func getAttrVal(tokenizer *html.Tokenizer, attrName string) string {
