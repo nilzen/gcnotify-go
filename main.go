@@ -27,7 +27,7 @@ type SettingsObject struct {
 
 func main() {
 
-	db, err := sqlite3.Open("./gcnotify.db")
+	db, err := sqlite3.Open("gcnotify.db")
 
 	if err != nil {
 		fmt.Printf("Database error: %v\n", err)
