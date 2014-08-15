@@ -1,0 +1,8 @@
+{
+	"GeocachingUserId": "", // From the userid cookie on geocaching.com
+	"GeocachingGspkUserId": "", // From the gspkuserid cookie on geocaching.com
+	"GeocachingLat": 12.123, // The lat where you want to search
+	"GeocachingLng": 12.123, // The lng where you want to search
+	"PushoverUser": "", // The pushover.net user/group key 
+	"PushoverToken": "" // The pushover.net application API token
+}
