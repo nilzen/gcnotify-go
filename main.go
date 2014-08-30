@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -57,107 +58,120 @@ func main() {
 	var settings SettingsObject
 	json.Unmarshal(settingsFile, &settings)
 
+	var wg sync.WaitGroup
+
+	for _, location := range settings.SearchLocations {
+		wg.Add(1)
+
+		go getGeocaches(&wg, location, db, settings)
+	}
+
+	wg.Wait()
+}
+
+func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn, settings SettingsObject) {
+
+	url := fmt.Sprintf("http://www.geocaching.com/seek/nearest.aspx?lat=%v&lng=%v&dist=%v&ex=1", location.Lat, location.Lng, location.Dist)
+
+	fmt.Printf("Search url: %s\n", url)
+
 	expiration := time.Now().AddDate(1, 0, 0)
 
 	userIdCookie := http.Cookie{Name: "userid", Value: settings.GeocachingUserId, Expires: expiration}
 	gspkUserIdCookie := http.Cookie{Name: "gspkuserid", Value: settings.GeocachingGspkUserId, Expires: expiration}
 
-	for _, location := range settings.SearchLocations {
+	req, _ := http.NewRequest("GET", url, nil)
+	req.AddCookie(&userIdCookie)
+	req.AddCookie(&gspkUserIdCookie)
 
-		url := fmt.Sprintf("http://www.geocaching.com/seek/nearest.aspx?lat=%v&lng=%v&dist=%v&ex=1", location.Lat, location.Lng, location.Dist)
+	jar, _ := cookiejar.New(nil)
 
-		fmt.Printf("Searching for new caches: %s\n", url)
+	client := http.Client{Jar: jar}
 
-		req, _ := http.NewRequest("GET", url, nil)
-		req.AddCookie(&userIdCookie)
-		req.AddCookie(&gspkUserIdCookie)
+	res, err := client.Do(req)
 
-		jar, _ := cookiejar.New(nil)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
 
-		client := http.Client{Jar: jar}
+	defer res.Body.Close()
 
-		res, err := client.Do(req)
+	tokenizer := html.NewTokenizer(res.Body)
 
-		if err != nil {
-			log.Fatal(err)
-			os.Exit(1)
-		}
+	buf := new(bytes.Buffer)
+	buf.ReadFrom(res.Body)
+	s := buf.String()
 
-		defer res.Body.Close()
+	fmt.Println(s)
 
-		tokenizer := html.NewTokenizer(res.Body)
+	inCacheRow, inCacheLinkCol, inCacheLink := false, false, false
+	foundCacheRow, isDisabledCache := false, false
 
-		buf := new(bytes.Buffer)
-		buf.ReadFrom(res.Body)
-		s := buf.String()
+	var currentTagName, currentCacheLink string
+	var tokenType html.TokenType
 
-		fmt.Println(s)
+	for tokenType != html.ErrorToken {
+		tokenType := tokenizer.Next()
+		switch tokenType {
 
-		inCacheRow, inCacheLinkCol, inCacheLink := false, false, false
-		foundCacheRow, isDisabledCache := false, false
+		case html.StartTagToken:
 
-		var currentTagName, currentCacheLink string
-		var tokenType html.TokenType
+			tagName, _ := tokenizer.TagName()
 
-		for tokenType != html.ErrorToken {
-			tokenType := tokenizer.Next()
-			switch tokenType {
+			currentTagName = string(tagName)
 
-			case html.StartTagToken:
+			if currentTagName == "tr" &&
+				hasAttrVal(tokenizer, "class", "Data") {
+				inCacheRow = true
+				foundCacheRow = true
+			}
 
-				tagName, _ := tokenizer.TagName()
+			if inCacheRow && currentTagName == "td" &&
+				hasAttrVal(tokenizer, "class", "Merge") {
+				inCacheLinkCol = true
 
-				currentTagName = string(tagName)
+			}
 
-				if currentTagName == "tr" &&
-					hasAttrVal(tokenizer, "class", "Data") {
-					inCacheRow = true
-					foundCacheRow = true
-				}
+			if inCacheLinkCol && currentTagName == "a" {
+				inCacheLink = true
+				currentCacheLink = getAttrVal(tokenizer, "href")
+				isDisabledCache = hasAttrVal(tokenizer, "class", "Strike")
+			}
 
-				if inCacheRow && currentTagName == "td" &&
-					hasAttrVal(tokenizer, "class", "Merge") {
-					inCacheLinkCol = true
+		case html.EndTagToken:
+			tagName, _ := tokenizer.TagName()
 
-				}
+			if string(tagName) == "tr" && inCacheRow {
+				inCacheRow = false
+				inCacheLinkCol = false
+				isDisabledCache = false
+			}
 
-				if inCacheLinkCol && currentTagName == "a" {
-					inCacheLink = true
-					currentCacheLink = getAttrVal(tokenizer, "href")
-					isDisabledCache = hasAttrVal(tokenizer, "class", "Strike")
-				}
+			if string(tagName) == "a" {
+				inCacheLink = false
+			}
 
-			case html.EndTagToken:
-				tagName, _ := tokenizer.TagName()
+		case html.TextToken:
 
-				if string(tagName) == "tr" && inCacheRow {
-					inCacheRow = false
-					inCacheLinkCol = false
-					isDisabledCache = false
-				}
+			text := tokenizer.Text()
+			fmt.Println(string(text))
 
-				if string(tagName) == "a" {
-					inCacheLink = false
-				}
+			if inCacheLink && currentTagName == "span" {
 
-			case html.TextToken:
-
-				text := tokenizer.Text()
-				fmt.Println(string(text))
-
-				if inCacheLink && currentTagName == "span" {
-
-					if !isDisabledCache && isNewCache(db, currentCacheLink, settings.GeocachingUserId) {
-						notifyNewCache(db, currentCacheLink, string(text), settings)
-					}
+				if !isDisabledCache && isNewCache(db, currentCacheLink, settings.GeocachingUserId) {
+					notifyNewCache(db, currentCacheLink, string(text), settings)
 				}
 			}
 		}
-
-		if !foundCacheRow {
-			sendPush("No caches returned", "", settings)
-		}
 	}
+
+	if !foundCacheRow {
+		sendPush("No caches returned", "", settings)
+	}
+
+	wg.Done()
+	return
 }
 
 func createDatabaseSchema(db *sqlite3.Conn) {
