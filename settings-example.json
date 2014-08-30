@@ -1,8 +1,18 @@
 {
 	"GeocachingUserId": "", // From the userid cookie on geocaching.com
 	"GeocachingGspkUserId": "", // From the gspkuserid cookie on geocaching.com
-	"GeocachingLat": 12.123, // The lat where you want to search
-	"GeocachingLng": 12.123, // The lng where you want to search
 	"PushoverUser": "", // The pushover.net user/group key 
-	"PushoverToken": "" // The pushover.net application API token
+	"PushoverToken": "", // The pushover.net application API token
+	"SearchLocations": [
+        {
+            "Dist": 5, // The range from lat/lng  you want to search (in miles)
+            "Lat": 123.123, // The lat where you want to search
+            "Lng": 123.123 // The lng where you want to search
+        },
+        {
+            "Dist": 5, // Same as above
+            "Lat": 234.234, // Same as above
+            "Lng": 234.234 // Same as above
+        }
+    ]
 }
