@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"code.google.com/p/go-sqlite/go1/sqlite3"
 	"code.google.com/p/go.net/html"
 	"encoding/json"
@@ -99,21 +98,20 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 
 	tokenizer := html.NewTokenizer(res.Body)
 
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(res.Body)
-	s := buf.String()
-
-	fmt.Println(s)
-
 	inCacheRow, inCacheLinkCol, inCacheLink := false, false, false
 	foundCacheRow, isDisabledCache := false, false
 
 	var currentTagName, currentCacheLink string
-	var tokenType html.TokenType
 
-	for tokenType != html.ErrorToken {
+	for {
+
 		tokenType := tokenizer.Next()
+
 		switch tokenType {
+
+		case html.ErrorToken:
+			wg.Done()
+			return
 
 		case html.StartTagToken:
 
@@ -130,7 +128,6 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 			if inCacheRow && currentTagName == "td" &&
 				hasAttrVal(tokenizer, "class", "Merge") {
 				inCacheLinkCol = true
-
 			}
 
 			if inCacheLinkCol && currentTagName == "a" {
@@ -140,6 +137,7 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 			}
 
 		case html.EndTagToken:
+
 			tagName, _ := tokenizer.TagName()
 
 			if string(tagName) == "tr" && inCacheRow {
@@ -155,7 +153,6 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 		case html.TextToken:
 
 			text := tokenizer.Text()
-			fmt.Println(string(text))
 
 			if inCacheLink && currentTagName == "span" {
 
@@ -169,14 +166,12 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 	if !foundCacheRow {
 		sendPush("No caches returned", "", settings)
 	}
-
-	wg.Done()
-	return
 }
 
 func createDatabaseSchema(db *sqlite3.Conn) {
 
 	query := "SELECT name FROM sqlite_master WHERE type='table' AND name='notifications';"
+
 	_, err := db.Query(query)
 
 	if err != nil {
@@ -185,7 +180,9 @@ func createDatabaseSchema(db *sqlite3.Conn) {
 }
 
 func isNewCache(db *sqlite3.Conn, url, userId string) bool {
+
 	query := fmt.Sprintf("SELECT id FROM notifications WHERE userid='%s' AND url='%s';", userId, url)
+
 	_, err := db.Query(query)
 
 	return err != nil
@@ -215,7 +212,9 @@ func sendPush(pushMessage, pushUrl string, settings SettingsObject) bool {
 }
 
 func getAttrVal(tokenizer *html.Tokenizer, attrName string) string {
+
 	for {
+
 		key, val, moreAttr := tokenizer.TagAttr()
 
 		if string(key) == attrName {
@@ -229,6 +228,7 @@ func getAttrVal(tokenizer *html.Tokenizer, attrName string) string {
 }
 
 func hasAttrVal(tokenizer *html.Tokenizer, attrName, attrValue string) bool {
+
 	val := getAttrVal(tokenizer, attrName)
 
 	if val == "" {
