@@ -39,7 +39,7 @@ func main() {
 	db, err := sqlite3.Open(dir + "/gcnotify.db")
 
 	if err != nil {
-		fmt.Printf("Database error: %v\n", err)
+		fmt.Printf("%v - Database error: %v\n", time.Now(), err)
 		os.Exit(1)
 	}
 
@@ -50,7 +50,7 @@ func main() {
 	settingsFile, err := ioutil.ReadFile(dir + "/settings.json")
 
 	if err != nil {
-		fmt.Printf("Settings file error: %v\n", err)
+		fmt.Printf("%v - Settings file error: %v\n", time.Now(), err)
 		os.Exit(1)
 	}
 
@@ -72,7 +72,7 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 
 	url := fmt.Sprintf("http://www.geocaching.com/seek/nearest.aspx?lat=%v&lng=%v&dist=%v&ex=1", location.Lat, location.Lng, location.Dist)
 
-	fmt.Printf("Getting caches from url: %s\n", url)
+	fmt.Printf("%v - Getting caches from url: %s\n", time.Now(), url)
 
 	expiration := time.Now().AddDate(1, 0, 0)
 
@@ -157,7 +157,7 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 			if inCacheLink && currentTagName == "span" {
 
 				if !isDisabledCache && isNewCache(db, currentCacheLink, settings.GeocachingUserId) {
-					fmt.Printf("New cache found: %s\n", string(text))
+					fmt.Printf("%v - New cache found: %s\n", time.Now(), string(text))
 					notifyNewCache(db, currentCacheLink, string(text), settings)
 				}
 			}
@@ -165,7 +165,7 @@ func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn,
 	}
 
 	if !foundCacheRow {
-		fmt.Println("No caches returned!")
+		fmt.Printf("%v - No caches returned!\n", time.Now())
 		sendPush("No caches returned", "", settings)
 	}
 }
