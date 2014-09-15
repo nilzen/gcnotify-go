@@ -34,8 +34,6 @@ type SearchLocation struct {
 
 func main() {
 
-	fmt.Printf("gcnotify start\n")
-
 	dir, _ := filepath.Abs(filepath.Dir(os.Args[0]))
 
 	db, err := sqlite3.Open(dir + "/gcnotify.db")
