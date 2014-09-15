@@ -49,7 +49,7 @@ func main() {
 
 	createDatabaseSchema(db)
 
-	settingsFile, err := ioutil.ReadFile("./settings.json")
+	settingsFile, err := ioutil.ReadFile(dir + "/settings.json")
 
 	if err != nil {
 		fmt.Printf("Settings file error: %v\n", err)
