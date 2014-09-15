@@ -72,7 +72,7 @@ func main() {
 
 func getGeocaches(wg *sync.WaitGroup, location SearchLocation, db *sqlite3.Conn, settings SettingsObject) {
 
-	url := fmt.Sprintf("Getthttp://www.geocaching.com/seek/nearest.aspx?lat=%v&lng=%v&dist=%v&ex=1", location.Lat, location.Lng, location.Dist)
+	url := fmt.Sprintf("http://www.geocaching.com/seek/nearest.aspx?lat=%v&lng=%v&dist=%v&ex=1", location.Lat, location.Lng, location.Dist)
 
 	fmt.Printf("Getting caches from url: %s\n", url)
 
